@@ -8,8 +8,8 @@ from urllib.parse import urlencode
 from flask import Flask, request, jsonify, redirect, session, url_for
 from flask_cors import CORS
 from dotenv import load_dotenv
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import psycopg
+from psycopg.rows import dict_row
 import requests
 
 load_dotenv()
@@ -36,7 +36,7 @@ LEGACY_API_KEY = os.environ.get("API_KEY", "")
 
 def get_db_connection():
     """Get a database connection."""
-    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
 
 
 def init_db():
