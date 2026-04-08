@@ -655,6 +655,114 @@ def get_badge(username):
     return svg, 200, {'Content-Type': 'image/svg+xml'}
 
 
+# ─── WakaTime Compatibility Layer ─────────────────────────────────────────────
+
+@app.route("/api/v1/users/current/stats", methods=["GET"])
+@require_auth
+def wakatime_stats():
+    """WakaTime-compatible stats endpoint."""
+    user_id = request.user_id
+    range_param = request.args.get("range", "last_7_days")
+    
+    # Map WakaTime range to days
+    range_map = {
+        "last_7_days": 7,
+        "last_30_days": 30,
+        "last_6_months": 180,
+        "last_year": 365,
+        "all_time": 3650
+    }
+    days = range_map.get(range_param, 7)
+    
+    cutoff = (datetime.utcnow() - timedelta(days=days)).timestamp() * 1000
+    
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT 
+                    language,
+                    SUM(duration) as total_seconds,
+                    COUNT(*) as session_count
+                FROM sessions
+                WHERE user_id = %s AND start_time >= %s
+                GROUP BY language
+                ORDER BY total_seconds DESC
+            """, (user_id, cutoff))
+            languages = cur.fetchall()
+            
+            cur.execute("""
+                SELECT 
+                    editor,
+                    SUM(duration) as total_seconds
+                FROM sessions
+                WHERE user_id = %s AND start_time >= %s
+                GROUP BY editor
+                ORDER BY total_seconds DESC
+            """, (user_id, cutoff))
+            editors = cur.fetchall()
+            
+            cur.execute("""
+                SELECT 
+                    SUM(duration) as total_seconds,
+                    COUNT(*) as session_count
+                FROM sessions
+                WHERE user_id = %s AND start_time >= %s
+            """, (user_id, cutoff))
+            totals = cur.fetchone()
+    
+    total_seconds = totals['total_seconds'] or 0
+    
+    # Format for WakaTime compatibility
+    return jsonify({
+        "data": {
+            "total_seconds": total_seconds,
+            "total_seconds_including_other_language": total_seconds,
+            "human_readable_total": f"{total_seconds // 3600}h {(total_seconds % 3600) // 60}m",
+            "daily_average": total_seconds // days if days > 0 else 0,
+            "languages": [
+                {
+                    "name": lang['language'] or "Unknown",
+                    "total_seconds": lang['total_seconds'],
+                    "percent": round(lang['total_seconds'] / total_seconds * 100, 2) if total_seconds > 0 else 0,
+                    "text": f"{lang['total_seconds'] // 3600}h {(lang['total_seconds'] % 3600) // 60}m"
+                }
+                for lang in languages[:10]
+            ],
+            "editors": [
+                {
+                    "name": ed['editor'] or "Unknown",
+                    "total_seconds": ed['total_seconds'],
+                    "percent": round(ed['total_seconds'] / total_seconds * 100, 2) if total_seconds > 0 else 0
+                }
+                for ed in editors
+            ],
+            "range": range_param,
+            "is_up_to_date": True
+        }
+    })
+
+
+@app.route("/api/v1/users/current", methods=["GET"])
+@require_auth
+def wakatime_user():
+    """WakaTime-compatible user endpoint."""
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT display_name, github_username, created_at
+                FROM users WHERE id = %s
+            """, (request.user_id,))
+            user = cur.fetchone()
+    
+    return jsonify({
+        "data": {
+            "username": user['github_username'] or "devtracker_user",
+            "display_name": user['display_name'] or "DevTracker User",
+            "created_at": user['created_at'].isoformat() if user['created_at'] else datetime.utcnow().isoformat()
+        }
+    })
+
+
 # ─── Main ────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
