@@ -664,7 +664,6 @@ def wakatime_stats():
     user_id = request.user_id
     range_param = request.args.get("range", "last_7_days")
     
-    # Map WakaTime range to days
     range_map = {
         "last_7_days": 7,
         "last_30_days": 30,
@@ -712,7 +711,6 @@ def wakatime_stats():
     
     total_seconds = totals['total_seconds'] or 0
     
-    # Format for WakaTime compatibility
     return jsonify({
         "data": {
             "total_seconds": total_seconds,
