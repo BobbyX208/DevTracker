@@ -45,9 +45,11 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is required")
 
+DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK_URL")
+
 GITHUB_CLIENT_ID = os.environ.get("GITHUB_CLIENT_ID")
 GITHUB_CLIENT_SECRET = os.environ.get("GITHUB_CLIENT_SECRET")
-GITHUB_REDIRECT_URI = os.environ.get("GITHUB_REDIRECT_URI", "http://localhost:5000/auth/github/callback")
+GITHUB_REDIRECT_URI = os.environ.get("GITHUB_REDIRECT_URI")
 
 LEGACY_API_KEY = os.environ.get("API_KEY", "")
 
@@ -171,6 +173,36 @@ def visitor_count():
     
     return jsonify({"count": count})
 
+@app.route('/contact', methods=['POST'])
+def contact():
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
+
+    name    = (data.get("name") or "").strip()
+    email   = (data.get("email") or "").strip()
+    message = (data.get("message") or "").strip()
+
+    if not all([name, email, message]):
+        return jsonify({"error": "Missing fields"}), 400
+
+    if not DISCORD_WEBHOOK:
+        return jsonify({"error": "Webhook not configured"}), 500
+
+    try:
+        requests.post(DISCORD_WEBHOOK, json={"embeds": [{
+            "title": "📬 New Portfolio Message",
+            "color": 0xFF5C00,
+            "fields": [
+                {"name": "Name",    "value": name,    "inline": True},
+                {"name": "Email",   "value": email,   "inline": True},
+                {"name": "Message", "value": message, "inline": False}
+            ],
+            "footer": {"text": f"bobbyx208.github.io · {datetime.now().strftime('%Y-%m-%d %H:%M')}"}
+        }]}, timeout=5)
+        return jsonify({"ok": True}), 200
+    except Exception:
+        return jsonify({"error": "Failed to send"}), 500
 
 @app.route("/devtracker/sessions", methods=["POST"])
 @require_auth
