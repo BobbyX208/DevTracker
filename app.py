@@ -144,6 +144,34 @@ def health():
     })
 
 
+@app.route("/visitor", methods=["GET", "POST"])
+def visitor_count():
+    """Get or increment visitor count."""
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            if request.method == "POST":
+                cur.execute("""
+                    INSERT INTO visitors (page, count) 
+                    VALUES ('portfolio', 1)
+                    ON CONFLICT (page) DO UPDATE 
+                    SET count = visitors.count + 1
+                    RETURNING count
+                """)
+            else:
+                cur.execute("""
+                    INSERT INTO visitors (page, count) 
+                    VALUES ('portfolio', 0)
+                    ON CONFLICT (page) DO NOTHING
+                """)
+                cur.execute("SELECT count FROM visitors WHERE page = 'portfolio'")
+            
+            result = cur.fetchone()
+            count = result['count'] if result else 0
+            conn.commit()
+    
+    return jsonify({"count": count})
+
+
 @app.route("/devtracker/sessions", methods=["POST"])
 @require_auth
 def ingest_sessions():
