@@ -18,7 +18,9 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 
-ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "chrome-extension://*").split(",")
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", 
+    "chrome-extension://*,https://*.koyeb.app,https://*.github.io,https://*.netlify.app,http://localhost:*,null"
+).split(",")
 CORS(app, origins=ALLOWED_ORIGINS)
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
