@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 from urllib.parse import urlencode
 
-from flask import Flask, request, jsonify, redirect, session, url_for
+from flask import Flask, request, jsonify, redirect, session, url_for, make_response
 from flask_cors import CORS
 from dotenv import load_dotenv
 import psycopg
@@ -18,10 +18,28 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 
-ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", 
-    "chrome-extension://*,https://*.koyeb.app,https://*.github.io,https://*.netlify.app,http://localhost:*,null"
-).split(",")
-CORS(app, origins=ALLOWED_ORIGINS)
+CORS(app, 
+     origins=[
+         "https://bobbyx208.github.io",
+         "https://*.github.io",
+         "https://*.netlify.app",
+         "chrome-extension://*"
+     ],
+     allow_headers=["Authorization", "Content-Type", "Accept"],
+     methods=["GET", "POST", "OPTIONS", "PUT", "DELETE"],
+     supports_credentials=False)
+
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        response = make_response()
+        origin = request.headers.get("Origin")
+        if origin in ["https://bobbyx208.github.io", "https://*.github.io"] or True:
+            response.headers.add("Access-Control-Allow-Origin", origin or "*")
+            response.headers.add("Access-Control-Allow-Headers", "Authorization, Content-Type")
+            response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            response.headers.add("Access-Control-Max-Age", "3600")
+        return response
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
