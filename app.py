@@ -182,6 +182,7 @@ def contact():
     name    = (data.get("name") or "").strip()
     email   = (data.get("email") or "").strip()
     message = (data.get("message") or "").strip()
+    service = (data.get("service") or "").strip()
 
     if not all([name, email, message]):
         return jsonify({"error": "Missing fields"}), 400
@@ -189,15 +190,19 @@ def contact():
     if not DISCORD_WEBHOOK:
         return jsonify({"error": "Webhook not configured"}), 500
 
+    fields = [
+        {"name": "Name",    "value": name,    "inline": True},
+        {"name": "Email",   "value": email,   "inline": True},
+    ]
+    if service:
+        fields.append({"name": "🎯 Interested In", "value": service, "inline": False})
+    fields.append({"name": "Message", "value": message, "inline": False})
+
     try:
         requests.post(DISCORD_WEBHOOK, json={"embeds": [{
-            "title": "📬 New Portfolio Message",
+            "title": "📬 New Portfolio Message" if not service else f"💼 Quote Request — {service}",
             "color": 0xFF5C00,
-            "fields": [
-                {"name": "Name",    "value": name,    "inline": True},
-                {"name": "Email",   "value": email,   "inline": True},
-                {"name": "Message", "value": message, "inline": False}
-            ],
+            "fields": fields,
             "footer": {"text": f"bobbyx208.github.io · {datetime.now().strftime('%Y-%m-%d %H:%M')}"}
         }]}, timeout=5)
         return jsonify({"ok": True}), 200
